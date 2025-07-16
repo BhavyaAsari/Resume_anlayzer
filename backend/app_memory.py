@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from suggester.suggestor import suggest_careers
 from utility.affinda import Affinda
-from utility.ai_agent import career_guidance_agent
+from utility.ai_agent import career_guidance_agent, get_industry_trends, generate_interview_questions
 import io
 import re
 from datetime import datetime
@@ -74,9 +74,8 @@ def process_pdf_in_memory(file_stream):
 # -----------------------------
 
 def parse_resume_text(text):
-    """Parse resume text and extract structured information"""
     try:
-        result = {
+        return {
             'status': 'success',
             'name': extract_name(text),
             'email': extract_email(text),
@@ -89,34 +88,28 @@ def parse_resume_text(text):
             'certifications': extract_certifications(text),
             'projects': extract_projects(text)
         }
-        return result
     except Exception as e:
         return {'status': 'error', 'error': f'Parsing failed: {str(e)}'}
 
 def extract_name(text):
-    """Extract name from resume text"""
     lines = text.split('\n')
-    for line in lines[:10]:  # Check first 10 lines
+    for line in lines[:10]:
         line = line.strip()
         if line and len(line.split()) <= 4 and not re.search(r'[@\d]', line):
-            # Simple heuristic: likely a name if short, no email/numbers
             return line
     return "Name not found"
 
 def extract_email(text):
-    """Extract email from resume text"""
     email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
     emails = re.findall(email_pattern, text)
     return emails[0] if emails else "Email not found"
 
 def extract_phone(text):
-    """Extract phone number from resume text"""
     phone_patterns = [
         r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b',
         r'\(\d{3}\)\s*\d{3}[-.]?\d{4}',
         r'\+\d{1,3}[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}'
     ]
-    
     for pattern in phone_patterns:
         phones = re.findall(pattern, text)
         if phones:
@@ -124,39 +117,30 @@ def extract_phone(text):
     return "Phone not found"
 
 def extract_skills(text):
-    """Extract skills from resume text"""
-    # Common technical skills keywords
     tech_skills = [
         'python', 'java', 'javascript', 'react', 'node.js', 'html', 'css',
         'sql', 'mongodb', 'postgresql', 'git', 'docker', 'kubernetes',
         'aws', 'azure', 'gcp', 'machine learning', 'data science',
         'angular', 'vue.js', 'spring', 'django', 'flask', 'express'
     ]
-    
-    # Common soft skills
     soft_skills = [
         'communication', 'teamwork', 'leadership', 'problem-solving',
         'adaptability', 'time management', 'critical thinking',
         'project management', 'analytical thinking'
     ]
-    
     all_skills = tech_skills + soft_skills
-    found_skills = []
-    
+    found = []
     text_lower = text.lower()
     for skill in all_skills:
         if skill in text_lower:
-            found_skills.append(skill.title())
-    
-    return list(set(found_skills))  # Remove duplicates
+            found.append(skill.title())
+    return list(set(found))
 
 def extract_education(text):
-    """Extract education information"""
     education_patterns = [
         r'(bachelor|master|phd|doctorate|diploma|certificate).*?(\d{4})',
         r'(b\.?s\.?|m\.?s\.?|b\.?a\.?|m\.?a\.?|phd).*?(\d{4})'
     ]
-    
     education = []
     for pattern in education_patterns:
         matches = re.findall(pattern, text, re.IGNORECASE)
@@ -167,63 +151,47 @@ def extract_education(text):
                 'organization': 'University/College',
                 'grade': 'N/A'
             })
-    
     return education
 
 def extract_work_experience(text):
-    """Extract work experience"""
-    # Look for years that might indicate work experience
     year_pattern = r'(\d{4})\s*[-–]\s*(\d{4}|present|current)'
     experiences = re.findall(year_pattern, text, re.IGNORECASE)
-    
     if experiences:
         return f"Found {len(experiences)} work experience entries"
     return "No work experience found"
 
 def extract_sections(text):
-    """Extract different sections from resume"""
     sections = {}
-    
-    # Look for common section headers
     section_patterns = {
         'projects': r'projects?:?\s*(.*?)(?=\n\n|\n[A-Z]|$)',
         'certifications': r'certifications?:?\s*(.*?)(?=\n\n|\n[A-Z]|$)',
         'achievements': r'achievements?:?\s*(.*?)(?=\n\n|\n[A-Z]|$)',
         'interests': r'interests?:?\s*(.*?)(?=\n\n|\n[A-Z]|$)'
     }
-    
     for section, pattern in section_patterns.items():
         matches = re.findall(pattern, text, re.IGNORECASE | re.DOTALL)
         sections[section] = matches[0].strip() if matches else ""
-    
     return sections
 
 def extract_summary(text):
-    """Extract professional summary"""
     summary_patterns = [
         r'summary:?\s*(.*?)(?=\n\n|\n[A-Z]|$)',
         r'objective:?\s*(.*?)(?=\n\n|\n[A-Z]|$)',
         r'profile:?\s*(.*?)(?=\n\n|\n[A-Z]|$)'
     ]
-    
     for pattern in summary_patterns:
         matches = re.findall(pattern, text, re.IGNORECASE | re.DOTALL)
         if matches:
             return matches[0].strip()
-    
-    # If no explicit summary, return first few lines
     lines = text.split('\n')
     for i, line in enumerate(lines):
-        if len(line.strip()) > 50:  # Substantial line
+        if len(line.strip()) > 50:
             return line.strip()
-    
     return "No summary available"
 
 def extract_certifications(text):
-    """Extract certifications"""
     cert_keywords = ['certified', 'certification', 'certificate', 'aws', 'azure', 'google cloud']
     certifications = []
-    
     lines = text.split('\n')
     for line in lines:
         line_lower = line.lower()
@@ -231,23 +199,19 @@ def extract_certifications(text):
             if keyword in line_lower:
                 certifications.append(line.strip())
                 break
-    
     return certifications
 
 def extract_projects(text):
-    """Extract project information"""
     project_patterns = [
         r'projects?:?\s*(.*?)(?=education|experience|skills|$)',
         r'project\s+\d+:?\s*(.*?)(?=project|\n\n|$)'
     ]
-    
     projects = []
     for pattern in project_patterns:
         matches = re.findall(pattern, text, re.IGNORECASE | re.DOTALL)
         for match in matches:
             if match.strip():
                 projects.append(match.strip())
-    
     return projects
 
 # -----------------------------
@@ -271,6 +235,29 @@ def health_check():
         'service': 'resume-analyzer'
     })
 
+@app.route('/industry-trends', methods=['POST'])
+def industry_trends():
+    try:
+        data = request.get_json()
+        skills = data.get('skills', [])
+        trends = get_industry_trends(skills)
+        return jsonify({'trends': trends, 'status': 'success'})
+    except Exception as e:
+        return jsonify({'trends': '', 'status': 'error', 'error': str(e)})
+
+@app.route('/interview-questions', methods=['POST'])
+def interview_questions():
+    try:
+        data = request.get_json()
+        role = data.get('role', '')
+        skills = data.get('skills', [])
+        if not role:
+            return jsonify({'status': 'error', 'error': 'Role is required'}), 400
+        questions = generate_interview_questions(role, skills)
+        return jsonify({'status': 'success', 'questions': questions})
+    except Exception as e:
+        return jsonify({'status': 'error', 'error': str(e)})
+
 @app.route('/analyze-resume', methods=['POST'])
 def analyze_resume():
     try:
@@ -291,15 +278,11 @@ def analyze_resume():
         try:
             affinda_result = Affinda.parse_resume(file.stream, file.filename)
             if affinda_result['status'] == 'success':
-                # Add career suggestions
                 affinda_result['career_suggestions'] = suggest_careers({
                     'skills': affinda_result.get('skills', [])
                 })
-                
-                # Add AI agent career guidance
                 print("🧠 Generating AI career advice with Gemini...")
                 affinda_result["ai_agent_career_advice"] = career_guidance_agent(affinda_result)
-                
                 affinda_result['source'] = 'affinda'
                 return jsonify(affinda_result)
             else:
@@ -307,7 +290,6 @@ def analyze_resume():
         except Exception as e:
             print(f"❌ Affinda exception: {str(e)}")
 
-        # 🔁 Fallback parser
         print("⚠️ Affinda failed. Using enhanced fallback...")
         file.stream.seek(0)
         fallback_result = process_pdf_in_memory(file.stream)
@@ -315,16 +297,11 @@ def analyze_resume():
         if fallback_result['status'] == 'success':
             fallback_result['source'] = 'fallback'
             fallback_result['note'] = 'Processed using local parser (Affinda unavailable)'
-
-            # Add career suggestions
             fallback_result['career_suggestions'] = suggest_careers({
                 'skills': fallback_result.get('skills', [])
             })
-
-            # ✅ Inject AI agent career guidance using Gemini
             print("🧠 Generating AI career advice with Gemini...")
             fallback_result["ai_agent_career_advice"] = career_guidance_agent(fallback_result)
-
             print("✅ Fallback parsing successful with AI agent advice")
         else:
             print(f"❌ Fallback failed: {fallback_result.get('error')}")
