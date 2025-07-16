@@ -1,21 +1,20 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
-import ResumeUploader from './components/ResumeUploader'
+import Header from "./components/Header";
+import Footer from "./components/Footer";
+import ResumeUploader from "./components/ResumeUploader";
+import "./App.css";
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-  
-      <div>
-               <ResumeUploader />
-
-      </div>
-        
-  
-  )
+    <div className="app-wrapper">
+      <Header />
+      <main className="main-wrapper">
+        <div className="container">
+          <ResumeUploader />
+        </div>
+      </main>
+      <Footer />
+    </div>
+  );
 }
 
-export default App
+export default App;
