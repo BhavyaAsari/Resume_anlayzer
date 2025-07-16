@@ -1,45 +1,38 @@
-# 📝 Resume Analyzer
+# 🧠 Resume Analyzer (AI + React + Flask)
 
-A simple web application to upload resumes (PDF) and extract key information like skills, education, and experience.
+A smart resume analyzer that extracts details from PDF resumes, suggests career paths, and provides AI-powered feedback using Google Gemini.
 
 ---
 
 ## 🚀 Features
-- Upload PDF resumes.
-- Extract structured data from resumes.
-- View extracted skills, education, and experience.
+
+- 📄 Resume PDF Upload
+- 🧠 AI Career Advice (Gemini Pro)
+- 🛠️ Fallback Parser (PyPDF2, pdfminer)
+- 📊 Industry Trends from Skills
+- 💻 React + Flask Fullstack
+- 🧰 Affinda API integration (structured resume parsing)
+- 🎯 Categorized skill extraction
 
 ---
 
-## 🛠️ Tech Stack
-- **Frontend:** React, Vite, CSS
-- **Backend:** Python (FastAPI / Flask)
+## 📦 Clone the Project
 
----
-
-## ⚙️ How to Run Locally
-
-### 1️⃣ Clone Repository
 ```bash
 git clone https://github.com/BhavyaAsari/Resume_anlayzer.git
 cd Resume_anlayzer
+
+
 cd backend
+
+# Step 1: Create virtual environment
 python -m venv venv
+
+# Step 2: Activate it
+# Windows:
 venv\Scripts\activate
+# macOS/Linux:
+source venv/bin/activate
+
+# Step 3: Install dependencies
 pip install -r requirements.txt
-python app.py  # or main.py
-
- Frontend Setup
-cd resume-analyzer-frontend
-npm install
-npm run dev
-
-
-📥 Usage
-Open the React app.
-
-Upload your PDF resume.
-
-See extracted results.
-
-
